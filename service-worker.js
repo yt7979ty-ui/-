@@ -3,7 +3,7 @@ self.addEventListener('install', (e) => {
     caches.open('quiz-spec-v1').then((cache) => {
       return cache.addAll([
         './',
-        './index.html',
+        './app.html',
         './manifest.json',
         './icon-192.png',
         './icon-512.png'
@@ -17,3 +17,4 @@ self.addEventListener('fetch', (e) => {
     caches.match(e.request).then((response) => response || fetch(e.request))
   );
 });
+
