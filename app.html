@@ -104,7 +104,7 @@
     </style>
     </head>
 <body>
-    <h1>選択アプリ</h1>
+    <h1>5択</h1>
     <p>A〜Eの中から1つ選んでください。</p>
 
     <div id="choice-container">
@@ -255,7 +255,16 @@
     });
     // --- 'DOMContentLoaded' イベントリスナーの終了 ---
     </script>
+
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('service-worker.js')
+          .then((reg) => console.log('Service Worker registered.', reg))
+          .catch((err) => console.log('Service Worker registration failed:', err));
+      }
+    </script>
     </body>
 </html>
+
 
 
