@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>5択アプリ (修正版)</title>
+    
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 15px;
+            background-color: #f4f4f4;
+            color: #333;
+            text-align: center;
+        }
+        h1, h2 {
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 5px;
+            color: #0056b3;
+        }
+        #choice-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        .choice-button {
+            padding: 20px;
+            font-size: 1.5em;
+            font-weight: bold;
+            cursor: pointer;
+            border: none;
+            border-radius: 8px;
+            color: white;
+            transition: background-color 0.2s;
+        }
+        #btn-A { background-color: #FF6347; }
+        #btn-B { background-color: #4682B4; }
+        #btn-C { background-color: #32CD32; }
+        #btn-D { background-color: #FFD700; color: #333;}
+        #btn-E { background-color: #8A2BE2; }
+
+        .choice-button:hover:not(.disabled) {
+            opacity: 0.8;
+        }
+        .choice-button.disabled {
+            background-color: #cccccc;
+            color: #666666;
+            cursor: not-allowed;
+            opacity: 1;
+        }
+        #result-display {
+            margin: 20px 0;
+            padding: 15px;
+            font-size: 1.8em;
+            font-weight: bold;
+            border-radius: 8px;
+            background-color: #e9ecef;
+            color: #007bff;
+            border: 1px solid #ced4da;
+            /* 結果がなくても高さを保つ */
+            min-height: 1.8em; 
+        }
+        #reset-button {
+            padding: 15px;
+            font-size: 1.2em;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            display: none; 
+            margin-top: 10px;
+        }
+        #history-list {
+            list-style: none;
+            padding: 0;
+            text-align: left;
+        }
+        #history-list li {
+            background-color: #ffffff;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px 15px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        #history-list li small {
+            color: #666;
+            display: block;
+            margin-top: 5px;
+        }
+        .error-message {
+            color: #721c24;
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            padding: 10px;
+            border-radius: 5px;
+            display: none; /* 初期状態は非表示 */
+        }
+    </style>
+    </head>
+<body>
+    <h1>選択アプリ</h1>
+    <p>A〜Eの中から1つ選んでください。</p>
+
+    <div id="choice-container">
+        <button class="choice-button" id="btn-A">A</button>
+        <button class="choice-button" id="btn-B">B</button>
+        <button class="choice-button" id="btn-C">C</button>
+        <button class="choice-button" id="btn-D">D</button>
+        <button class="choice-button" id="btn-E">E</button>
+    </div>
+
+    <div id="result-display"></div>
+
+    <button id="reset-button">もう一度</button>
+
+    <div id="storage-error" class="error-message">
+        <strong>警告:</strong> ブラウザのプライベートモードなどにより、履歴の保存ができませんでした。
+    </div>
+
+    <hr>
+
+    <h2>選択履歴</h2>
+    <p>（新しい順に表示されます）</p>
+    <ol id="history-list"></ol>
+
+
+    <script>
+    
+    // --- 【修正点1】すべてのスクリプトを 'DOMContentLoaded' で囲む ---
+    // これにより、HTMLの読み込みが完了してからJavaScriptが実行されることを保証します。
+    document.addEventListener('DOMContentLoaded', () => {
+
+        // --- 定数・変数 ---
+        const historyKey = 'selectionHistory'; // localStorageに保存する時の名前
+
+        // --- DOM要素の取得 (DOM読み込み後に実行) ---
+        const resultDisplay = document.getElementById('result-display');
+        const historyList = document.getElementById('history-list');
+        const choiceContainer = document.getElementById('choice-container');
+        const resetButton = document.getElementById('reset-button');
+        const storageErrorMsg = document.getElementById('storage-error');
+        
+        // choice-container の中の button タグをすべて取得
+        const buttons = choiceContainer.getElementsByTagName('button');
+
+        // --- 【修正点2】イベントリスナーを手動で設定 ---
+        document.getElementById('btn-A').addEventListener('click', () => makeChoice('A'));
+        document.getElementById('btn-B').addEventListener('click', () => makeChoice('B'));
+        document.getElementById('btn-C').addEventListener('click', () => makeChoice('C'));
+        document.getElementById('btn-D').addEventListener('click', () => makeChoice('D'));
+        document.getElementById('btn-E').addEventListener('click', () => makeChoice('E'));
+        resetButton.addEventListener('click', resetGame);
+
+
+        // --- 1. メイン処理 ---
+        function makeChoice(selectedChoice) {
+            
+            const isConfirmed = window.confirm(selectedChoice + ' でよろしいですか？\n(決定後は変更できません)');
+
+            if (isConfirmed) {
+                disableButtons();
+                resultDisplay.textContent = `「${selectedChoice}」を選択しました。`;
+                resultDisplay.className = ''; 
+                
+                saveHistory(selectedChoice);
+                renderHistory();
+                
+                resetButton.style.display = 'block';
+            }
+        }
+
+        // --- 2. (ヘルパー) 全てのボタンを無効化 ---
+        function disableButtons() {
+            for (let btn of buttons) {
+                btn.disabled = true;
+                btn.classList.add('disabled');
+            }
+        }
+
+        // --- 3. (ヘルパー) ゲームをリセット（もう一度） ---
+        function resetGame() {
+            for (let btn of buttons) {
+                btn.disabled = false;
+                btn.classList.remove('disabled');
+            }
+            resultDisplay.textContent = '';
+            resultDisplay.className = '';
+            resetButton.style.display = 'none';
+            storageErrorMsg.style.display = 'none'; // エラーメッセージを非表示に
+        }
+
+        // --- 4. (ヘルパー) 履歴をlocalStorageに保存 ---
+        function saveHistory(choice) {
+            let history = getHistory(); // 読み込みも関数化
+
+            const entry = {
+                choice: choice,
+                timestamp: new Date().toLocaleString('ja-JP')
+            };
+            history.unshift(entry);
+
+            // --- 【修正点3】localStorage書き込み時のエラー処理 ---
+            try {
+                localStorage.setItem(historyKey, JSON.stringify(history));
+            } catch (e) {
+                console.error("履歴の保存に失敗しました:", e);
+                storageErrorMsg.style.display = 'block'; // エラーメッセージ表示
+            }
+        }
+        
+        // --- 5. (ヘルパー) 履歴をlocalStorageから取得 ---
+        function getHistory() {
+            // --- 【修正点3】localStorage読み込み時のエラー処理 ---
+            try {
+                const historyData = localStorage.getItem(historyKey);
+                return historyData ? JSON.parse(historyData) : [];
+            } catch (e) {
+                console.error("履歴の読み込みに失敗しました:", e);
+                storageErrorMsg.style.display = 'block';
+                return []; // エラー時は空の配列を返す
+            }
+        }
+
+        // --- 6. (ヘルパー) 履歴を画面に描画 ---
+        function renderHistory() {
+            let history = getHistory();
+            historyList.innerHTML = ''; // 表示をリセット
+
+            if (history.length === 0) {
+                historyList.innerHTML = '<li>履歴はありません</li>';
+                return;
+            }
+
+            history.forEach(entry => {
+                const li = document.createElement('li');
+                li.innerHTML = `
+                    <strong>選択: ${entry.choice}</strong>
+                    <br>
+                    <small>${entry.timestamp}</small>
+                `;
+                historyList.appendChild(li);
+            });
+        }
+
+        // --- 7. アプリ起動時の初期化処理 ---
+        // (DOMContentLoaded の最後に実行)
+        renderHistory();
+
+    });
+    // --- 'DOMContentLoaded' イベントリスナーの終了 ---
+    </script>
+    </body>
+</html>
